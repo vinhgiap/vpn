@@ -254,6 +254,7 @@ class _MyHomePageState extends State<Home> {
           height: 0,
         ),
         onChanged: (Vpn? newValue) {
+          _showRewardedAd();
           onSelect(newValue!);
           setState(() {
             dropdownValue = newValue;

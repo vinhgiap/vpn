@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 // import 'package:firebase_admob/firebase_admob.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:securevpn/constants/stringConst.dart';
 import 'package:securevpn/modal/vpn.dart';
@@ -12,6 +14,7 @@ import '../../widgets/circularButton.dart';
 import '../../widgets/connectionText.dart';
 import '../../widgets/customClipper/customClipper.dart';
 
+const int maxFailedLoadAttempts = 3;
 class Home extends StatefulWidget {
   static String routeName = '/home';
   Home({Key? key}) : super(key: key);
@@ -22,48 +25,138 @@ class Home extends StatefulWidget {
 Timer? timer;
 
 class _MyHomePageState extends State<Home> {
-  // static const MobileAdTargetingInfo targetingInfo = MobileAdTargetingInfo(
-  //   keywords: <String>['foo', 'bar'],
-  //   contentUrl: 'http://foo.com/bar.html',
-  //   childDirected: true,
-  //   nonPersonalizedAds: true,
-  // );
-
-  // BannerAd _bannerAd;
-
-  // BannerAd createBannerAd() {
-  //   return BannerAd(
-  //     adUnitId: Platform.isAndroid
-  //         ? StringConst.ADMOB_APP_BANNER_Android
-  //         : Platform.isIOS
-  //             ? StringConst.ADMOB_APP_BANNER_IOS
-  //             : "",
-  //     size: AdSize.banner,
-  //     targetingInfo: targetingInfo,
-  //     listener: (MobileAdEvent event) {
-  //       print("BannerAd event $event");
-  //     },
-  //   );
-  // }
-
+  static final AdRequest request = AdRequest(
+    keywords: <String>['foo', 'bar'],
+    contentUrl: 'http://foo.com/bar.html',
+    nonPersonalizedAds: true,
+  );
   bool loading = false;
   List<Vpn> _vpns = [];
   Vpn? highestSpeed;
   Vpn? dropdownValue;
   bool init = true;
+  RewardedAd? _rewardedAd;
+  int _numRewardedLoadAttempts = 0;
+
+  InterstitialAd? _interstitialAd;
+  int _numInterstitialLoadAttempts = 0;
+  bool isShowInterstitial = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _createInterstitialAd();
+    _createRewardedAd();
+  }
   @override
   void didChangeDependencies() {
     if (init) {
-      // _bannerAd ??= createBannerAd();
-      // _bannerAd
-      //   ..load()
-      //   ..show();
       _vpns = Provider.of<Vpns>(context, listen: false).vpns;
       highestSpeed = Provider.of<Vpns>(context).getHighSpeed();
     }
     init = false;
     super.didChangeDependencies();
   }
+
+  void _showRewardedAd() {
+    if (_rewardedAd == null) {
+      print('Warning: attempt to show rewarded before loaded.');
+      return;
+    }
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (RewardedAd ad) =>
+          print('ad onAdShowedFullScreenContent.'),
+      onAdDismissedFullScreenContent: (RewardedAd ad) {
+        print('$ad onAdDismissedFullScreenContent.');
+        ad.dispose();
+        _createRewardedAd();
+      },
+      onAdFailedToShowFullScreenContent: (RewardedAd ad, AdError error) {
+        print('$ad onAdFailedToShowFullScreenContent: $error');
+        ad.dispose();
+        _createRewardedAd();
+      },
+    );
+
+    _rewardedAd!.setImmersiveMode(true);
+    _rewardedAd!.show(
+        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+          print('$ad with reward $RewardItem(${reward.amount}, ${reward.type})');
+
+        });
+    _rewardedAd = null;
+  }
+
+  void _createRewardedAd() {
+    RewardedAd.load(
+        adUnitId: Platform.isAndroid
+            ? StringConst.ADMOB_APP_REWARD_ANDROID
+            : StringConst.ADMOB_APP_REWARD_IOS,
+        request: request,
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (RewardedAd ad) {
+            print('$ad loaded.');
+            _rewardedAd = ad;
+            _numRewardedLoadAttempts = 0;
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            print('RewardedAd failed to load: $error');
+            _rewardedAd = null;
+            _numRewardedLoadAttempts += 1;
+            if (_numRewardedLoadAttempts < maxFailedLoadAttempts) {
+              _createRewardedAd();
+            }
+          },
+        ));
+  }
+
+  void _showInterstitialAd() {
+    if (_interstitialAd == null) {
+      print('Warning: attempt to show interstitial before loaded.');
+      return;
+    }
+    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (InterstitialAd ad) =>
+          print('ad onAdShowedFullScreenContent.'),
+      onAdDismissedFullScreenContent: (InterstitialAd ad) {
+        print('$ad onAdDismissedFullScreenContent.');
+        ad.dispose();
+        _createInterstitialAd();
+      },
+      onAdFailedToShowFullScreenContent: (InterstitialAd ad, AdError error) {
+        print('$ad onAdFailedToShowFullScreenContent: $error');
+        ad.dispose();
+        _createInterstitialAd();
+      },
+    );
+    _interstitialAd!.show();
+    _interstitialAd = null;
+  }
+
+  void _createInterstitialAd() {
+    InterstitialAd.load(
+        adUnitId: Platform.isAndroid
+            ? StringConst.ADMOB_APP_INTERSTITIAL_Android
+            : StringConst.ADMOB_APP_INTERSTITIAL_IOS,
+        request: request,
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (InterstitialAd ad) {
+            print('$ad loaded');
+            _interstitialAd = ad;
+            _numInterstitialLoadAttempts = 0;
+            _interstitialAd!.setImmersiveMode(true);
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            print('InterstitialAd failed to load: $error.');
+            _numInterstitialLoadAttempts += 1;
+            _interstitialAd = null;
+            if (_numInterstitialLoadAttempts < maxFailedLoadAttempts) {
+              _createInterstitialAd();
+            }
+          },
+        ));
+  }
+
 
   void onSelect(Vpn vpn) {
     Provider.of<Vpns>(context, listen: false).connect(vpn);
@@ -72,6 +165,12 @@ class _MyHomePageState extends State<Home> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
+    Future.delayed(Duration(milliseconds: 3000),(){
+      if(!isShowInterstitial){
+        isShowInterstitial= true;
+        _showInterstitialAd();
+      }
+    });
     return Scaffold(
         backgroundColor: bgColor,
         body: ListView(
@@ -209,6 +308,7 @@ class _MyHomePageState extends State<Home> {
               SizedBox(height: 14.0),
               InkWell(
                 onTap: () {
+                  _showRewardedAd();
                   onSelect(highestSpeed!);
                   setState(() {
                     dropdownValue = highestSpeed;
@@ -263,6 +363,8 @@ class _MyHomePageState extends State<Home> {
               )
             ]));
   }
+
+
 
   Widget upperCurvedContainer(BuildContext context) {
     return ClipPath(
@@ -363,4 +465,5 @@ Widget _bottomRow(
       //     ),
       //   ],
       );
+
 }

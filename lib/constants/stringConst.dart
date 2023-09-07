@@ -23,6 +23,10 @@ class StringConst {
   static const ADMOB_APP_INTERSTITIAL_Android =
       "ca-app-pub-3940256099942544/1033173712";
 
+  static const ADMOB_APP_REWARD_ANDROID = "ca-app-pub-3940256099942544/5224354917";
+  static const ADMOB_APP_REWARD_IOS = "ca-app-pub-3940256099942544/1712485313";
+
+
   static List<Map<String, dynamic>> slider = [
     {
       'header': "Super-Fast Video",

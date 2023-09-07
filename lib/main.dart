@@ -1,6 +1,6 @@
-// import 'package:firebase_admob/firebase_admob.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:securevpn/modal/vpn.dart';
 import 'package:securevpn/screen/home/home.dart';
@@ -17,14 +17,8 @@ void main()  async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  MobileAds.instance.initialize();
   runApp(MyApp());
-  // FirebaseAdMob.instance.initialize(
-  //   appId: Platform.isAndroid
-  //       ? StringConst.ADMOB_APP_ID_Android
-  //       : Platform.isIOS
-  //           ? StringConst.ADMOB_APP_ID_IOS
-  //           : "",
-  // );
 }
 
 class MyApp extends StatelessWidget {
